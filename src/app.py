@@ -3,65 +3,26 @@ from streamlit import Page, navigation
 
 st.set_page_config(layout="wide")
 
-themes = {
-    "Light": {
-        "primaryColor": "#ff4b4b",
-        "backgroundColor": "#ffffff",
-        "secondaryBackgroundColor": "#f0f2f6",
-        "textColor": "#31333f"
-    },
-    "Dark": {
-        "primaryColor": "#ff4b4b",
-        "backgroundColor": "#0D0D0D",
-        "secondaryBackgroundColor": "1A1A1A",
-        "textColor": "#fafafa"
+st.markdown("""
+<style>
+    .stApp { 
+        background-color: #ffffff;
+        
+        background-image: linear-gradient(rgba(255,255,255,0.8), rgba(255,255,255,0.8)), 
+                          url("https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.svg");
+        
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
     }
-}
+</style>
+""", unsafe_allow_html=True)
 
+st.title("Flight Delay")
 
-col1, col2 = st.columns([0.85, 0.15])
-
-with col1:
-    st.title("Flight Delay")
-
-with col2:
-    chosen_theme = st.selectbox(
-        "Selecione o Tema:", 
-        list(themes.keys()), 
-        label_visibility="collapsed" 
-    )
-
-def apply_theme(theme_name):
-    theme = themes[theme_name]
-    css = f"""
-    <style>
-        :root {{
-            --primary-color: {theme['primaryColor']};
-            --background-color: {theme['backgroundColor']};
-            --secondary-background-color: {theme['secondaryBackgroundColor']};
-            --text-color: {theme['textColor']};
-        }}
-        .stApp {{
-            background-color: {theme['backgroundColor']};
-            color: {theme['textColor']};
-        }}
-        [data-testid="stSidebar"] {{
-            background-color: {theme['secondaryBackgroundColor']};
-        }}
-        .stButton>button {{
-            color: {theme['textColor']};
-            border-color: {theme['primaryColor']};
-            background-color: {theme['secondaryBackgroundColor']};
-        }}
-    </style>
-    """
-
-    st.markdown(css, unsafe_allow_html=True)
-
-apply_theme(chosen_theme)
-
+Nova_Previsão= Page("pages/Nova_Previsão.py")
 Dashboard= Page("pages/Dashboard.py")
 Storytelling= Page("pages/Storytelling.py")
 
-nav = navigation([Dashboard, Storytelling])
+nav = navigation([Nova_Previsão, Dashboard, Storytelling])
 nav.run()
