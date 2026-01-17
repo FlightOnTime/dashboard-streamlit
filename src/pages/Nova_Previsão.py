@@ -96,10 +96,8 @@ with tab1:
         submit_button = st.form_submit_button("Prever Atraso")
         
     if submit_button:
-        # Converte o nome completo para código IATA
         cia_codigo = CARRIER_MAP[cia_nome]
         
-        # Extrai códigos IATA dos aeroportos selecionados
         if not airports_df.empty:
             ori_codigo = get_iata_from_selection(ori_selection)
             dest_codigo = get_iata_from_selection(dest_selection)
@@ -107,7 +105,6 @@ with tab1:
             ori_codigo = ori_selection
             dest_codigo = dest_selection
         
-        # Validação
         if not ori_codigo or not dest_codigo:
             st.error("Por favor, selecione aeroportos válidos.")
         else:
@@ -146,7 +143,6 @@ with tab2:
     st.subheader("📊 Upload de Arquivo CSV")
     st.info("O arquivo CSV deve conter as colunas: companhia, origem_aeroporto, destino_aeroporto, data_partida, distancia_km")
     
-    # Exemplo de formato CSV
     with st.expander("Ver exemplo de formato CSV"):
         exemplo_df = pd.DataFrame({
             'companhia': ['AA', 'DL'],
@@ -221,12 +217,10 @@ with tab2:
                 
                 status_text.text("✅ Processamento concluído!")
                 
-                # Exibir resultados
                 results_df = pd.DataFrame(results)
                 st.subheader("📈 Resultados das Previsões")
                 st.dataframe(results_df[['Voo', 'Companhia', 'Origem', 'Destino', 'Probabilidade (%)', 'Status']])
                 
-                # Botão para download dos resultados
                 csv_results = results_df.to_csv(index=False).encode('utf-8')
                 st.download_button(
                     label="📥 Download Resultados (CSV)",
@@ -235,7 +229,6 @@ with tab2:
                     mime="text/csv"
                 )
                 
-                # Exibir retornos completos da API
                 with st.expander("🔍 Ver Retornos Completos da API"):
                     for result in results:
                         st.write(f"**Voo {result['Voo']}:**")

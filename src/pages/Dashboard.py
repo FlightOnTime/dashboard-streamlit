@@ -5,10 +5,11 @@ import os
 from datetime import datetime
 import plotly.express as px
 import plotly.graph_objects as go
-import numpy as np
+from psycopg2 import pool
+from dotenv import load_dotenv
 
 @st.cache_data
-def carregar_aeroportos_openflights():
+def loadAirporsOpenFlights():
     """Carrega dados de aeroportos do OpenFlights via GitHub"""
     url = "https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat"
     
@@ -20,106 +21,148 @@ def carregar_aeroportos_openflights():
     ]
     
     try:
-        df_airports = pd.read_csv(url, header=None, names=colunas, na_values='\\N')
+        dfAirports = pd.read_csv(url, header=None, names=colunas, na_values='\\N')
         
         # Filtrar apenas aeroportos com código IATA válido
-        df_airports = df_airports[df_airports['iata'].notna()]
+        dfAirports = dfAirports[dfAirports['iata'].notna()]
         
         # Criar dicionário para lookup rápido por código IATA
-        airport_dict = {}
-        for _, row in df_airports.iterrows():
-            airport_dict[row['iata']] = {
+        airportDict = {}
+        for _, row in dfAirports.iterrows():
+            airportDict[row['iata']] = {
                 'lat': row['latitude'],
                 'lon': row['longitude'],
                 'nome': f"{row['name']} - {row['city']}, {row['country']}"
             }
         
-        return airport_dict
+        return airportDict
+    
     except Exception as e:
         st.error(f"Erro ao carregar dados do OpenFlights: {str(e)}")
         return {}
-    
+
+load_dotenv()   
+DB_CONFIG = {
+    'host': os.getenv('DB_HOST'),
+    'port': int(os.getenv('DB_PORT')),
+    'database': os.getenv('DB_NAME'),
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD')
+}
+   
 @st.cache_data
+#Cria o pool de conexões
+def get_connection_pool():
+    try:
+        connection_pool = pool.SimpleConnectionPool(
+            1, 5,  
+            **DB_CONFIG
+        )
+        return connection_pool
+    except Exception as e:
+        st.error(f"❌ Erro ao criar pool de conexões: {str(e)}")
+        return None
+
+def get_connection():
+    """Obtém uma conexão do pool"""
+    pool = get_connection_pool()
+    if pool:
+        try:
+            return pool.getconn()
+        except Exception as e:
+            st.error(f"Erro ao obter conexão: {str(e)}")
+            return None
+    return None
+
+def release_connection(conn):
+    """Libera a conexão de volta ao pool"""
+    pool = get_connection_pool()
+    if pool and conn:
+        pool.putconn(conn)
+
+@st.cache_data(ttl=300)
 def loadData():
-    connection = sqlite3.connect(":memory:")
-
-    pages = os.path.dirname(os.path.abspath(__file__))
+    conn = get_connection()
     
-    archivePath = os.path.join(pages, 'MOCK_DATA.sql')
+    if not conn:
+        st.error("❌ Não foi possível conectar ao banco de dados")
+        return pd.DataFrame()
     
-    with open(archivePath, 'r') as f:
-        sqlScript = f.read()
-
-    connection.executescript(sqlScript)
-
-    query = "SELECT * FROM MOCK_DATA"
-    df = pd.read_sql_query(query, connection)
-    connection.close()
-
-    df['data_partida'] = pd.to_datetime(df['data_partida'])
-    df['data_apenas'] = df['data_partida'].dt.date
-    df['linhas_aereas'] = df['origem_aeroporto'] + " -> " + df['destino_aeroporto']
-    df['hora_partida'] = df['data_partida'].dt.hour
+    try:
+        # Query para PostgreSQL (nome da tabela em minúsculas)
+        query = "SELECT * FROM prediction_history ORDER BY data_partida"
+        
+        # Executar query
+        df = pd.read_sql_query(query, conn)
+        
+        # Processamento dos dados (igual ao original)
+        df['data_partida'] = pd.to_datetime(df['data_partida'])
+        df['data_apenas'] = df['data_partida'].dt.date
+        df['linhas_aereas'] = df['origem_aeroporto'] + " -> " + df['destino_aeroporto']
+        df['hora_partida'] = df['data_partida'].dt.hour
+        
+        return df
     
-    return df
-def loadDataToday():
-    connection = sqlite3.connect(":memory:")
-
-    pages = os.path.dirname(os.path.abspath(__file__))
+    except Exception as e:
+        st.error(f"❌ Erro ao carregar dados: {str(e)}")
+        return pd.DataFrame()
     
-    archivePath = os.path.join(pages, 'MOCK_DATA.sql')
-    
-    with open(archivePath, 'r') as f:
-        sqlScript = f.read()
-
-    connection.executescript(sqlScript)
-
-    query = "SELECT * FROM MOCK_DATA WHERE DATE(data_partida) = DATE('now')"
-    df = pd.read_sql_query(query, connection)
-    connection.close()
-
-    df['data_partida'] = pd.to_datetime(df['data_partida'])
-    df['data_apenas'] = df['data_partida'].dt.date
-    df['linhas_aereas'] = df['origem_aeroporto'] + " -> " + df['destino_aeroporto']
-    df['hora_partida'] = df['data_partida'].dt.hour
-    
-    return df
+    finally:
+        release_connection(conn)
 
 def loadDataToday():
-    connection = sqlite3.connect(":memory:")
-
-    pages = os.path.dirname(os.path.abspath(__file__))
+    conn = get_connection()
     
-    archivePath = os.path.join(pages, 'MOCK_DATA.sql')
+    if not conn:
+        st.error("❌ Não foi possível conectar ao banco de dados")
+        return pd.DataFrame()
     
-    with open(archivePath, 'r') as f:
-        sqlScript = f.read()
-
-    connection.executescript(sqlScript)
-
-    query = "SELECT * FROM MOCK_DATA WHERE DATE(data_partida) = DATE('now')"
-    df = pd.read_sql_query(query, connection)
-    connection.close()
-
-    df['data_partida'] = pd.to_datetime(df['data_partida'])
-    df['data_apenas'] = df['data_partida'].dt.date
-    df['linhas_aereas'] = df['origem_aeroporto'] + " -> " + df['destino_aeroporto']
-    df['hora_partida'] = df['data_partida'].dt.hour
+    try:
+        query = """
+            SELECT * FROM prediction_history
+            WHERE DATE(data_partida) = CURRENT_DATE
+            ORDER BY data_partida
+        """
+        
+        # Executar query
+        df = pd.read_sql_query(query, conn)
+        
+        df['data_partida'] = pd.to_datetime(df['data_partida'])
+        df['data_apenas'] = df['data_partida'].dt.date
+        df['linhas_aereas'] = df['origem_aeroporto'] + " -> " + df['destino_aeroporto']
+        df['hora_partida'] = df['data_partida'].dt.hour
+        
+        # Adicionar coordenadas dos aeroportos
+        aeroportos_coords = loadAirporsOpenFlights()
+        
+        df['origem_latitude'] = df['origem_aeroporto'].map(
+            lambda x: aeroportos_coords.get(x, {}).get('lat', None)
+        )
+        df['origem_longitude'] = df['origem_aeroporto'].map(
+            lambda x: aeroportos_coords.get(x, {}).get('lon', None)
+        )
+        df['origem_nome_completo'] = df['origem_aeroporto'].map(
+            lambda x: aeroportos_coords.get(x, {}).get('nome', x)
+        )
+        
+        df['destino_latitude'] = df['destino_aeroporto'].map(
+            lambda x: aeroportos_coords.get(x, {}).get('lat', None)
+        )
+        df['destino_longitude'] = df['destino_aeroporto'].map(
+            lambda x: aeroportos_coords.get(x, {}).get('lon', None)
+        )
+        df['destino_nome_completo'] = df['destino_aeroporto'].map(
+            lambda x: aeroportos_coords.get(x, {}).get('nome', x)
+        )
+        
+        return df
     
-    # Carregar dados de aeroportos do OpenFlights
-    aeroportos_coords = carregar_aeroportos_openflights()
+    except Exception as e:
+        st.error(f"❌ Erro ao carregar dados de hoje: {str(e)}")
+        return pd.DataFrame()
     
-    # Adicionar coordenadas de origem
-    df['origem_latitude'] = df['origem_aeroporto'].map(lambda x: aeroportos_coords.get(x, {}).get('lat', None))
-    df['origem_longitude'] = df['origem_aeroporto'].map(lambda x: aeroportos_coords.get(x, {}).get('lon', None))
-    df['origem_nome_completo'] = df['origem_aeroporto'].map(lambda x: aeroportos_coords.get(x, {}).get('nome', x))
-    
-    # Adicionar coordenadas de destino
-    df['destino_latitude'] = df['destino_aeroporto'].map(lambda x: aeroportos_coords.get(x, {}).get('lat', None))
-    df['destino_longitude'] = df['destino_aeroporto'].map(lambda x: aeroportos_coords.get(x, {}).get('lon', None))
-    df['destino_nome_completo'] = df['destino_aeroporto'].map(lambda x: aeroportos_coords.get(x, {}).get('nome', x))
-    
-    return df
+    finally:
+        release_connection(conn)
 
 try:
     dfToday = loadDataToday()
@@ -130,51 +173,38 @@ try:
     with col2:
         st.button("🔄 Atualizar Dados") 
     
-    # Carregar dados completos para ter acesso a todas as coordenadas
-    df_completo = loadData()
-    if dfToday.empty:
-        raise ValueError("Não há dados de voos para hoje")
+    airportsOri = dfToday[['origem_aeroporto', 'origem_latitude', 'origem_longitude', 'origem_nome_completo']].copy()
+    airportsOri.columns = ['aeroporto', 'latitude', 'longitude', 'nome_completo']
     
+    airportsDest = dfToday[['destino_aeroporto', 'destino_latitude', 'destino_longitude', 'destino_nome_completo']].copy()
+    airportsDest.columns = ['aeroporto', 'latitude', 'longitude', 'nome_completo']
+
+    dfAirports = pd.concat([airportsOri, airportsDest]).drop_duplicates(subset=['aeroporto'])
+
+    dfAirports = dfAirports.dropna(subset=['latitude', 'longitude'])
     
-    # Criar DataFrame com coordenadas únicas dos aeroportos
-    aeroportos_origem = df_completo[['origem_aeroporto', 'origem_latitude', 'origem_longitude', 'origem_nome_completo']].copy()
-    aeroportos_origem.columns = ['aeroporto', 'latitude', 'longitude', 'nome_completo']
+    origin = dfToday['origem_aeroporto'].value_counts()
+    destination = dfToday['destino_aeroporto'].value_counts()
+    total = origin.add(destination, fill_value=0)
+    dfAirports['total'] = dfAirports['aeroporto'].map(total).fillna(0)
     
-    aeroportos_destino = df_completo[['destino_aeroporto', 'destino_latitude', 'destino_longitude', 'destino_nome_completo']].copy()
-    aeroportos_destino.columns = ['aeroporto', 'latitude', 'longitude', 'nome_completo']
-    
-    # Combinar e remover duplicatas
-    df_aeroportos = pd.concat([aeroportos_origem, aeroportos_destino]).drop_duplicates(subset=['aeroporto'])
-    
-    # Remover aeroportos sem coordenadas
-    df_aeroportos = df_aeroportos.dropna(subset=['latitude', 'longitude'])
-    
-    # Contar número de voos por aeroporto (como intensidade)
-    voos_origem = dfToday['origem_aeroporto'].value_counts()
-    voos_destino = dfToday['destino_aeroporto'].value_counts()
-    total_voos = voos_origem.add(voos_destino, fill_value=0)
-    
-    df_aeroportos['total_voos'] = df_aeroportos['aeroporto'].map(total_voos).fillna(0)
-    
-    # Criar o mapa
     fig1 = go.Figure()
 
-    # Adiciona a camada de aeroportos
     fig1.add_trace(go.Scattergeo(
-        lon = df_aeroportos['longitude'],
-        lat = df_aeroportos['latitude'],
+        lon = dfAirports['longitude'],
+        lat = dfAirports['latitude'],
         mode = 'markers',
         marker = dict(
-            size = 12 + df_aeroportos['total_voos'] * 2,
-            color = df_aeroportos['total_voos'],
+            size = 12 + dfAirports['total_voos'] * 2,
+            color = dfAirports['total_voos'],
             colorscale = 'Inferno',
             cmin = 0,
-            cmax = df_aeroportos['total_voos'].max() if len(df_aeroportos) > 0 else 1,
+            cmax = dfAirports['total_voos'].max() if len(dfAirports) > 0 else 1,
             opacity = 0.8,
             colorbar = dict(title="Nº de Voos"),
             line = dict(width=1, color='white')
         ),
-        text = df_aeroportos['nome_completo'] + '<br>Código: ' + df_aeroportos['aeroporto'] + '<br>Voos: ' + df_aeroportos['total_voos'].astype(int).astype(str),
+        text = dfAirports['nome_completo'] + '<br>Código: ' + dfAirports['aeroporto'] + '<br>Voos: ' + dfAirports['total_voos'].astype(int).astype(str),
         hoverinfo = 'text',
         name = 'Aeroportos'
     ))
@@ -200,14 +230,6 @@ try:
     )
     
     st.plotly_chart(fig1, use_container_width=True)
-    
-    # Mostrar informações sobre aeroportos sem coordenadas (se houver)
-    aeroportos_sem_coords = df_completo[df_completo['origem_latitude'].isna()]['origem_aeroporto'].unique()
-    if len(aeroportos_sem_coords) > 0:
-        st.warning(f"⚠️ Aeroportos sem coordenadas no OpenFlights: {', '.join(aeroportos_sem_coords)}")
-    
-    # Mostrar estatísticas
-    st.info(f"✅ Total de aeroportos identificados: {len(df_aeroportos)}")
     
 
     col1, col2 = st.columns(2)
@@ -428,10 +450,7 @@ try:
             title='Top 5 Linhas Aéreas com Maior Média de Atrasos'
         )
         st.plotly_chart(fig6, use_container_width=True)
-
-    
-    
-    
+  
     with col1:    
         csv_filtered_date = df.to_csv(index=False).encode('utf-8')
         st.download_button(
