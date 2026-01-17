@@ -50,8 +50,7 @@ DB_CONFIG = {
     'password': os.getenv('DB_PASSWORD')
 }
    
-@st.cache_data
-#Cria o pool de conexões
+@st.cache_resource
 def get_connection_pool():
     try:
         connection_pool = pool.SimpleConnectionPool(
@@ -195,16 +194,16 @@ try:
         lat = dfAirports['latitude'],
         mode = 'markers',
         marker = dict(
-            size = 12 + dfAirports['total_voos'] * 2,
-            color = dfAirports['total_voos'],
+            size = 12 + dfAirports['total'] * 2,
+            color = dfAirports['total'],
             colorscale = 'Inferno',
             cmin = 0,
-            cmax = dfAirports['total_voos'].max() if len(dfAirports) > 0 else 1,
+            cmax = dfAirports['total'].max() if len(dfAirports) > 0 else 1,
             opacity = 0.8,
             colorbar = dict(title="Nº de Voos"),
             line = dict(width=1, color='white')
         ),
-        text = dfAirports['nome_completo'] + '<br>Código: ' + dfAirports['aeroporto'] + '<br>Voos: ' + dfAirports['total_voos'].astype(int).astype(str),
+        text = dfAirports['nome_completo'] + '<br>Código: ' + dfAirports['aeroporto'] + '<br>Voos: ' + dfAirports['total'].astype(int).astype(str),
         hoverinfo = 'text',
         name = 'Aeroportos'
     ))
@@ -229,7 +228,7 @@ try:
         plot_bgcolor="rgba(0,0,0,0)"
     )
     
-    st.plotly_chart(fig1, use_container_width=True)
+    st.plotly_chart(fig1, width="stretch")
     
 
     col1, col2 = st.columns(2)
@@ -250,7 +249,7 @@ try:
         fig2.update_layout(
             title='Distribuição de Status dos Voos'
         )
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, width="stretch")
         
     with col2:
         st.subheader("🚨 Aeroportos Mais Problemáticos")
@@ -274,7 +273,7 @@ try:
             title='Top 5 Aeroportos com Maior Taxa de Atraso',
             showlegend=False
         )
-        st.plotly_chart(fig3, use_container_width=True)
+        st.plotly_chart(fig3, width="stretch")
     
     st.subheader("⏰ Evolução de Atrasos por Hora")
     hourly_data = dfToday.groupby('hora_partida').agg({
@@ -324,7 +323,7 @@ try:
         height=500
     )
     
-    st.plotly_chart(fig4, use_container_width=True)
+    st.plotly_chart(fig4, width="stretch")
       
 except Exception as e:
     st.error(f"Erro no dashboad de dados de hoje: {str(e)}")
@@ -373,7 +372,7 @@ try:
             labels={'x': 'Companhia Aérea', 'y': 'Número de Voos'},
             title='Top 5 Companhias Aéreas'
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     with col2:
         st.subheader("Atrasos por Dia da Semana")
         delaysByDay = df.groupby('dia_da_semana')['atraso_previsto'].sum().reindex([0,1,2,3,4,5,6])
@@ -387,7 +386,7 @@ try:
             xaxis_title='Dia da Semana',
             yaxis_title='Média de Atrasos'
         )
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, width="stretch")
 
     with col1:
         st.subheader("Linhas Aéreas e Atrasos")
@@ -399,7 +398,7 @@ try:
             labels={'x': 'Linha Aérea', 'y': 'Média de Atrasos'},
             title='Top 5 Linhas Aéreas com Maior Média de Atrasos'
         )
-        st.plotly_chart(fig3, use_container_width=True)
+        st.plotly_chart(fig3, width="stretch")
     with col2:
         st.subheader("Atrasos por Hora do Dia")
         delaysByHour = df.groupby('hora_partida')['atraso_previsto'].sum()
@@ -414,7 +413,7 @@ try:
             xaxis_title='Hora do Dia',
             yaxis_title='Média de Atrasos'
         )
-        st.plotly_chart(fig4, use_container_width=True)
+        st.plotly_chart(fig4, width="stretch")
     
     company =  sorted(df['companhia_aerea'].unique().tolist())
 
@@ -438,7 +437,7 @@ try:
             labels={'x': 'Linha Aérea', 'y': 'Número de Voos'},
             title='Top 5 Linhas Aéreas'
         )
-        st.plotly_chart(fig5, use_container_width=True)
+        st.plotly_chart(fig5, width="stretch")
     with col2:
         st.subheader("Atrasos por Linha Aérea")
         delaysByLine = dfCleaned.groupby('linhas_aereas')['atraso_previsto'].mean().sort_values(ascending=False).head(5)
@@ -449,7 +448,7 @@ try:
             labels={'x': 'Linha Aérea', 'y': 'Média de Atrasos'},
             title='Top 5 Linhas Aéreas com Maior Média de Atrasos'
         )
-        st.plotly_chart(fig6, use_container_width=True)
+        st.plotly_chart(fig6, width="stretch")
   
     with col1:    
         csv_filtered_date = df.to_csv(index=False).encode('utf-8')
