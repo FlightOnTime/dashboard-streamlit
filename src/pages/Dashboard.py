@@ -330,6 +330,31 @@ except Exception as e:
 
 try:
     df = loadData()
+
+    if 'companhia_aerea' not in df.columns:
+        for alt in ['airline', 'companhia', 'airline_name', 'operadora', 'operator']:
+            if alt in df.columns:
+                df['companhia_aerea'] = df[alt]
+                break
+        else:
+            df['companhia_aerea'] = 'Desconhecida'
+
+    if 'dia_da_semana' not in df.columns:
+        if 'data_partida' in df.columns:
+            df['data_partida'] = pd.to_datetime(df['data_partida'])
+            df['dia_da_semana'] = df['data_partida'].dt.weekday
+        else:
+            df['dia_da_semana'] = -1
+
+    if 'linhas_aereas' not in df.columns:
+        if 'origem_aeroporto' in df.columns and 'destino_aeroporto' in df.columns:
+            df['linhas_aereas'] = df['origem_aeroporto'].astype(str) + " -> " + df['destino_aeroporto'].astype(str)
+        else:
+            df['linhas_aereas'] = ''
+
+    if 'hora_partida' not in df.columns and 'data_partida' in df.columns:
+        df['data_partida'] = pd.to_datetime(df['data_partida'])
+        df['hora_partida'] = df['data_partida'].dt.hour
     st.header("🔍 Filtros")
     
     availableDates = sorted(df['data_apenas'].unique())
